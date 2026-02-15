@@ -520,7 +520,7 @@ class SuccessScene extends Phaser.Scene {
     });
 
     btn.on("pointerdown", () => {
-      this.scene.start("TitleScene");
+      this.scene.start("Puzzle1Scene");
     });
   }
 }
