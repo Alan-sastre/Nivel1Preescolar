@@ -25,9 +25,12 @@ var config = {
     willReadFrequently: true,
   },
   scene: [
-    ContextoScene,
-    RobotPuzzleScene,
-    QuizScene,
+    BootScene,
+    TitleScene,
+    Puzzle1Scene,
+    Puzzle2Scene,
+    Puzzle3Scene,
+    SuccessScene
   ],
 
 };
