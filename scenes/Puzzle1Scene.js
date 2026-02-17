@@ -6,6 +6,9 @@ class Puzzle1Scene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
+    // Iniciar gestor de audio
+    new AudioManager(this, "backgroundMusic");
+
     // Fondo azul animado
     this.createAnimatedBackground();
 
@@ -40,7 +43,9 @@ class Puzzle1Scene extends Phaser.Scene {
     };
 
     // Crear piezas arrastrables con etiquetas
-    this.createDraggablePart(
+    this.pieces = [];
+
+    const head = this.createDraggablePart(
       width - 150,
       200,
       120,
@@ -51,7 +56,16 @@ class Puzzle1Scene extends Phaser.Scene {
       targetHeadY,
       "CABEZA",
     );
-    this.createDraggablePart(
+    this.pieces.push({
+      container: head,
+      startX: width - 150,
+      startY: 200,
+      targetX: targetHeadX,
+      targetY: targetHeadY,
+      placed: false,
+    });
+
+    const torso = this.createDraggablePart(
       150,
       200,
       180,
@@ -62,9 +76,68 @@ class Puzzle1Scene extends Phaser.Scene {
       targetTorsoY,
       "CUERPO",
     );
+    this.pieces.push({
+      container: torso,
+      startX: 150,
+      startY: 200,
+      targetX: targetTorsoX,
+      targetY: targetTorsoY,
+      placed: false,
+    });
 
     this.partsPlaced = 0;
     this.totalParts = 2;
+
+    // Iniciar tutorial dinámico
+    this.updateTutorial();
+  }
+
+  updateTutorial() {
+    if (this.hand) {
+      this.hand.destroy();
+      this.hand = null;
+    }
+
+    const nextPiece = this.pieces.find((p) => !p.placed);
+    if (nextPiece) {
+      this.showTutorial(
+        nextPiece.startX,
+        nextPiece.startY,
+        nextPiece.targetX,
+        nextPiece.targetY,
+      );
+    }
+  }
+
+  showTutorial(startX, startY, endX, endY) {
+    this.hand = this.add
+      .text(startX, startY, "👆", {
+        fontSize: "60px",
+        fontFamily: "Arial",
+        padding: { x: 20, y: 20 },
+      })
+      .setOrigin(0.5)
+      .setDepth(100);
+
+    this.tweens.add({
+      targets: this.hand,
+      x: endX,
+      y: endY,
+      duration: 2000,
+      ease: "Power2",
+      repeat: -1,
+      onRepeat: () => {
+        if (this.hand) {
+          this.hand.setPosition(startX, startY);
+          this.hand.setAlpha(1);
+        }
+      },
+      onUpdate: (tween) => {
+        if (this.hand && tween.progress > 0.8) {
+          this.hand.setAlpha((1 - tween.progress) * 5);
+        }
+      },
+    });
   }
 
   createAnimatedBackground() {
@@ -288,6 +361,14 @@ class Puzzle1Scene extends Phaser.Scene {
     container.setInteractive();
     this.input.setDraggable(container);
 
+    container.on("pointerdown", () => {
+      this.children.bringToTop(container);
+      if (this.hand) {
+        this.hand.destroy();
+        this.hand = null;
+      }
+    });
+
     container.on("drag", (pointer, dragX, dragY) => {
       container.x = dragX;
       container.y = dragY;
@@ -309,6 +390,13 @@ class Puzzle1Scene extends Phaser.Scene {
         container.y = ty;
         txt.setVisible(false); // Ocultar etiqueta al encajar
         container.disableInteractive();
+        this.playPlacementEffect(container);
+        
+        // Marcar como colocada y actualizar tutorial
+        const pieceData = this.pieces.find(p => p.container === container);
+        if (pieceData) pieceData.placed = true;
+        this.updateTutorial();
+
         this.partsPlaced++;
         this.checkWin();
       } else {
@@ -318,6 +406,9 @@ class Puzzle1Scene extends Phaser.Scene {
           y: y,
           duration: 500,
           ease: "Back.easeOut",
+          onComplete: () => {
+            this.updateTutorial();
+          }
         });
       }
     });
@@ -325,14 +416,108 @@ class Puzzle1Scene extends Phaser.Scene {
     return container;
   }
 
+  playPlacementEffect(target) {
+    // Efecto de escala
+    this.tweens.add({
+      targets: target,
+      scale: { from: 1.2, to: 1 },
+      duration: 300,
+      ease: "Back.out",
+    });
+
+    // Efecto de destello
+    const flash = this.add.rectangle(
+      target.x,
+      target.y,
+      target.width,
+      target.height,
+      0xffffff,
+    );
+    flash.setAlpha(0.8);
+    flash.setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scale: 1.5,
+      duration: 400,
+      onComplete: () => {
+        flash.destroy();
+      },
+    });
+
+    // Partículas simples
+    for (let i = 0; i < 10; i++) {
+      const p = this.add.circle(target.x, target.y, 4, 0x00ffff);
+      this.tweens.add({
+        targets: p,
+        x: target.x + Phaser.Math.Between(-50, 50),
+        y: target.y + Phaser.Math.Between(-50, 50),
+        alpha: 0,
+        duration: 500,
+        onComplete: () => p.destroy(),
+      });
+    }
+  }
+
   checkWin() {
     if (this.partsPlaced === this.totalParts) {
-      this.time.delayedCall(500, () => {
+      this.showCelebration(() => {
         this.scene.start("Puzzle2Scene", {
           headPos: { x: this.scale.width / 2, y: this.scale.height / 2 - 80 },
           torsoPos: { x: this.scale.width / 2, y: this.scale.height / 2 + 50 },
         });
       });
     }
+  }
+
+  showCelebration(onComplete) {
+    const { width, height } = this.scale;
+
+    // Texto de felicitación
+    const text = this.add
+      .text(width / 2, height / 2, "¡MUY BIEN!", {
+        fontFamily: "Orbitron",
+        fontSize: "64px",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setScale(0)
+      .setDepth(200);
+
+    this.tweens.add({
+      targets: text,
+      scale: 1,
+      angle: 360,
+      duration: 1000,
+      ease: "Back.out",
+    });
+
+    // Confeti
+    const colors = [
+      0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff,
+    ];
+
+    for (let i = 0; i < 100; i++) {
+      const x = Phaser.Math.Between(0, width);
+      const y = Phaser.Math.Between(-100, -10);
+      const color = Phaser.Utils.Array.GetRandom(colors);
+      const size = Phaser.Math.Between(5, 10);
+      const shape = this.add.rectangle(x, y, size, size, color).setDepth(199);
+
+      this.tweens.add({
+        targets: shape,
+        y: height + 50,
+        x: x + Phaser.Math.Between(-100, 100),
+        angle: Phaser.Math.Between(0, 360),
+        duration: Phaser.Math.Between(2000, 4000),
+        ease: "Sine.easeInOut",
+      });
+    }
+
+    // Esperar y cambiar de escena
+    this.time.delayedCall(3000, onComplete);
   }
 }

@@ -4,7 +4,8 @@ class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // No hay assets externos, pero podemos mostrar un mensaje de carga si fuera necesario
+    // Cargar música de fondo
+    this.load.audio("backgroundMusic", "assets/musica.mp3");
   }
 
   create() {

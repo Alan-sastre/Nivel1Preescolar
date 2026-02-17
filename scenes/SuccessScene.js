@@ -6,6 +6,9 @@ class SuccessScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
+    // Iniciar gestor de audio
+    new AudioManager(this, 'backgroundMusic');
+
     // Fondo azul animado de éxito
     this.createAnimatedBackground();
 

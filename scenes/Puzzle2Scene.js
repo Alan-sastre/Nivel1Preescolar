@@ -10,6 +10,9 @@ class Puzzle2Scene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
+    // Iniciar gestor de audio
+    new AudioManager(this, "backgroundMusic");
+
     // Fondo azul animado
     this.createAnimatedBackground();
 
@@ -42,30 +45,109 @@ class Puzzle2Scene extends Phaser.Scene {
     this.drawPartSilhouette(width / 2, height / 2 - 55, 80, 20, false); // Sensores
 
     // Piezas con etiquetas (Ajustadas a las siluetas)
-    this.createDraggableEye(
+    this.pieces = [];
+
+    const eyeL = this.createDraggableEye(
       150,
       height / 2 - 100,
       width / 2 - 30,
       height / 2 - 90,
       "OJO",
     );
-    this.createDraggableEye(
+    this.pieces.push({
+      container: eyeL,
+      startX: 150,
+      startY: height / 2 - 100,
+      targetX: width / 2 - 30,
+      targetY: height / 2 - 90,
+      placed: false,
+    });
+
+    const eyeR = this.createDraggableEye(
       width - 150,
       height / 2 - 100,
       width / 2 + 30,
       height / 2 - 90,
       "OJO",
     );
-    this.createDraggableSensors(
+    this.pieces.push({
+      container: eyeR,
+      startX: width - 150,
+      startY: height / 2 - 100,
+      targetX: width / 2 + 30,
+      targetY: height / 2 - 90,
+      placed: false,
+    });
+
+    const sensors = this.createDraggableSensors(
       width / 2,
       height - 100,
       width / 2,
       height / 2 - 55,
       "SENSORES",
     );
+    this.pieces.push({
+      container: sensors,
+      startX: width / 2,
+      startY: height - 100,
+      targetX: width / 2,
+      targetY: height / 2 - 55,
+      placed: false,
+    });
 
     this.partsPlaced = 0;
     this.totalParts = 3;
+
+    // Iniciar tutorial dinámico
+    this.updateTutorial();
+  }
+
+  updateTutorial() {
+    if (this.hand) {
+      this.hand.destroy();
+      this.hand = null;
+    }
+
+    const nextPiece = this.pieces.find((p) => !p.placed);
+    if (nextPiece) {
+      this.showTutorial(
+        nextPiece.startX,
+        nextPiece.startY,
+        nextPiece.targetX,
+        nextPiece.targetY,
+      );
+    }
+  }
+
+  showTutorial(startX, startY, endX, endY) {
+    this.hand = this.add
+      .text(startX, startY, "👆", {
+        fontSize: "60px",
+        fontFamily: "Arial",
+        padding: { x: 20, y: 20 },
+      })
+      .setOrigin(0.5)
+      .setDepth(100);
+
+    this.tweens.add({
+      targets: this.hand,
+      x: endX,
+      y: endY,
+      duration: 2000,
+      ease: "Power2",
+      repeat: -1,
+      onRepeat: () => {
+        if (this.hand) {
+          this.hand.setPosition(startX, startY);
+          this.hand.setAlpha(1);
+        }
+      },
+      onUpdate: (tween) => {
+        if (this.hand && tween.progress > 0.8) {
+          this.hand.setAlpha((1 - tween.progress) * 5);
+        }
+      },
+    });
   }
 
   createAnimatedBackground() {
@@ -369,6 +451,14 @@ class Puzzle2Scene extends Phaser.Scene {
     container.setInteractive();
     this.input.setDraggable(container);
 
+    container.on("pointerdown", () => {
+      this.children.bringToTop(container);
+      if (this.hand) {
+        this.hand.destroy();
+        this.hand = null;
+      }
+    });
+
     container.on("drag", (p, dx, dy) => {
       container.setPosition(dx, dy);
       container.setScale(1.2);
@@ -382,6 +472,13 @@ class Puzzle2Scene extends Phaser.Scene {
         container.setPosition(tx, ty);
         txt.setVisible(false);
         container.disableInteractive();
+        this.playPlacementEffect(container);
+
+        // Marcar como colocada y actualizar tutorial
+        const pieceData = this.pieces.find((p) => p.container === container);
+        if (pieceData) pieceData.placed = true;
+        this.updateTutorial();
+
         this.partsPlaced++;
         this.checkWin();
       } else {
@@ -391,9 +488,14 @@ class Puzzle2Scene extends Phaser.Scene {
           y: y,
           duration: 500,
           ease: "Back.out",
+          onComplete: () => {
+            this.updateTutorial();
+          },
         });
       }
     });
+
+    return container;
   }
 
   createDraggableSensors(x, y, tx, ty, label) {
@@ -435,6 +537,14 @@ class Puzzle2Scene extends Phaser.Scene {
     container.setInteractive();
     this.input.setDraggable(container);
 
+    container.on("pointerdown", () => {
+      this.children.bringToTop(container);
+      if (this.hand) {
+        this.hand.destroy();
+        this.hand = null;
+      }
+    });
+
     container.on("drag", (p, dx, dy) => {
       container.setPosition(dx, dy);
       container.setScale(1.2);
@@ -448,6 +558,13 @@ class Puzzle2Scene extends Phaser.Scene {
         container.setPosition(tx, ty);
         txt.setVisible(false);
         container.disableInteractive();
+        this.playPlacementEffect(container);
+
+        // Marcar como colocada y actualizar tutorial
+        const pieceData = this.pieces.find((p) => p.container === container);
+        if (pieceData) pieceData.placed = true;
+        this.updateTutorial();
+
         this.partsPlaced++;
         this.checkWin();
       } else {
@@ -457,9 +574,14 @@ class Puzzle2Scene extends Phaser.Scene {
           y: y,
           duration: 500,
           ease: "Back.out",
+          onComplete: () => {
+            this.updateTutorial();
+          },
         });
       }
     });
+
+    return container;
   }
 
   snap(container, ox, oy, tx, ty) {
@@ -468,6 +590,7 @@ class Puzzle2Scene extends Phaser.Scene {
       container.x = tx;
       container.y = ty;
       container.disableInteractive();
+      this.playPlacementEffect(container);
       this.partsPlaced++;
       this.checkWin();
     } else {
@@ -481,11 +604,105 @@ class Puzzle2Scene extends Phaser.Scene {
     }
   }
 
+  playPlacementEffect(target) {
+    // Efecto de escala
+    this.tweens.add({
+      targets: target,
+      scale: { from: 1.2, to: 1 },
+      duration: 300,
+      ease: "Back.out",
+    });
+
+    // Efecto de destello
+    const flash = this.add.rectangle(
+      target.x,
+      target.y,
+      target.width,
+      target.height,
+      0xffffff,
+    );
+    flash.setAlpha(0.8);
+    flash.setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scale: 1.5,
+      duration: 400,
+      onComplete: () => {
+        flash.destroy();
+      },
+    });
+
+    // Partículas simples
+    for (let i = 0; i < 10; i++) {
+      const p = this.add.circle(target.x, target.y, 4, 0x00ffff);
+      this.tweens.add({
+        targets: p,
+        x: target.x + Phaser.Math.Between(-50, 50),
+        y: target.y + Phaser.Math.Between(-50, 50),
+        alpha: 0,
+        duration: 500,
+        onComplete: () => p.destroy(),
+      });
+    }
+  }
+
   checkWin() {
     if (this.partsPlaced === this.totalParts) {
-      this.time.delayedCall(500, () => {
+      this.showCelebration(() => {
         this.scene.start("Puzzle3Scene", this.robotPos);
       });
     }
+  }
+
+  showCelebration(onComplete) {
+    const { width, height } = this.scale;
+
+    // Texto de felicitación
+    const text = this.add
+      .text(width / 2, height / 2, "¡EXCELENTE!", {
+        fontFamily: "Orbitron",
+        fontSize: "64px",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setScale(0)
+      .setDepth(200);
+
+    this.tweens.add({
+      targets: text,
+      scale: 1,
+      angle: 360,
+      duration: 1000,
+      ease: "Back.out",
+    });
+
+    // Confeti
+    const colors = [
+      0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff,
+    ];
+
+    for (let i = 0; i < 100; i++) {
+      const x = Phaser.Math.Between(0, width);
+      const y = Phaser.Math.Between(-100, -10);
+      const color = Phaser.Utils.Array.GetRandom(colors);
+      const size = Phaser.Math.Between(5, 10);
+      const shape = this.add.rectangle(x, y, size, size, color).setDepth(199);
+
+      this.tweens.add({
+        targets: shape,
+        y: height + 50,
+        x: x + Phaser.Math.Between(-100, 100),
+        angle: Phaser.Math.Between(0, 360),
+        duration: Phaser.Math.Between(2000, 4000),
+        ease: "Sine.easeInOut",
+      });
+    }
+
+    // Esperar y cambiar de escena
+    this.time.delayedCall(3000, onComplete);
   }
 }
